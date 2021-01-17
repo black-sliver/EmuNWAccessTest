@@ -1,0 +1,3 @@
+[submodule "EmuNWAccess-qt"]
+	path = EmuNWAccess-qt
+	url = https://github.com/black-sliver/EmuNWAccess-qt.git
