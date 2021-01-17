@@ -49,5 +49,6 @@ private slots:
     void on_btnRead_clicked();
     void on_lstCores_currentRowChanged(int currentRow);
     void on_btnCoreReset_clicked();
+    void on_btnReadWriteTest_clicked();
 };
 #endif // MAINWINDOW_H

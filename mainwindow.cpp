@@ -55,6 +55,7 @@ void MainWindow::on_emu_connected()
     ui->cbxWriteMemory->setEnabled(false);
     ui->btnRead->setEnabled(false);
     ui->btnWrite->setEnabled(false);
+    ui->btnReadWriteTest->setEnabled(false);
 
     ui->btnConnect->setText("Disconnect");
     ui->btnConnect->setEnabled(true);
@@ -63,31 +64,6 @@ void MainWindow::on_emu_connected()
     emu->cmdEmuInfo();
     emu->cmdCoresList();
     emu->cmdCoreMemories();
-
-#ifdef READ_WRITE_TEST
-    // Secret of Evermore call beads = WRAM 0x231c
-    ui->chkReadAppend->setCheckState(Qt::CheckState::Checked);
-    // single write, single read
-    emu->cmdCoreWriteMemory("WRAM", {"\x01\x00",2}, 0x231C);
-    emu->cmdCoreReadMemory ("WRAM", 0x231C, 1); // should return
-    // multi-write 1, multi-read
-    emu->cmdCoreWriteMemory("WRAM", { {0x231C, {"\x63",1}},{0x231B, {"\x00\x02",2}} } );
-    emu->cmdCoreReadMemory ("WRAM", {{ 0x231C,1 }, { 0x231B,2 }}); // should give 00 02 00
-    // multi-write 2, multi-read
-    QList<QPair<int,int>> tmp = { { 0x231C,1 }, { 0x231B,3 } };
-    emu->cmdCoreWriteMemory("WRAM", {"\x63\x00\x03\x00",4}, tmp); // should give 00 03 00
-    emu->cmdCoreReadMemory ("WRAM", {{ 0x231C,1 }, { 0x231B,2 }});
-    // memory write from strart 0
-    emu->cmdCoreReadMemory ("WRAM", 0, 1);
-    emu->cmdCoreWriteMemory("WRAM", {"\x01",1});
-    emu->cmdCoreReadMemory ("WRAM", -1, 1); // should give 01
-    // memory read/write to end
-    emu->cmdCoreReadMemory ("WRAM", 0x1ffff, 1);
-    emu->cmdCoreWriteMemory("WRAM", {"\xaa\x77",2}, 0x1ffff);
-    emu->cmdCoreReadMemory ("WRAM", 0x1ffff); // should give aa
-    // memory read with padding
-    emu->cmdCoreReadMemory ("WRAM", { { 0x1ffff,3 }, {0x1ffff,3} }); // should give aa 00 00 aa
-#endif
 
     statusTimer->connect(statusTimer, &QTimer::timeout, this, [this](){
         emu->cmdEmuStatus();
@@ -180,6 +156,8 @@ void MainWindow::on_emu_readyRead()
                 QString access = map.contains("access") ? map["access"] : "rw";
                 if (access.contains('r')) ui->cbxReadMemory->addItem(map["name"]);
                 if (access.contains('w')) ui->cbxWriteMemory->addItem(map["name"]);
+                if (map["name"] == "WRAM" && access.contains('w'))
+                    ui->btnReadWriteTest->setEnabled(true);
             }
         }
         ui->cbxReadMemory->setEnabled(ui->cbxReadMemory->count()>0);
@@ -294,6 +272,7 @@ void MainWindow::on_btnCoreLoad_clicked()
     ui->cbxWriteMemory->clear();
     ui->btnRead->setEnabled(false);
     ui->btnWrite->setEnabled(false);
+    ui->btnReadWriteTest->setEnabled(false);
     emu->cmdLoadCore(ui->lstCores->currentRow()>=0 ? ui->lstCores->currentItem()->text().split(" ")[1] : "");
     emu->cmdCoreMemories();
 }
@@ -327,6 +306,7 @@ void MainWindow::on_btnCoreUnload_clicked()
     ui->cbxWriteMemory->clear();
     ui->btnRead->setEnabled(false);
     ui->btnWrite->setEnabled(false);
+    ui->btnReadWriteTest->setEnabled(false);
     emu->cmdLoadCore("");
     emu->cmdCoreMemories();
 }
@@ -341,4 +321,55 @@ void MainWindow::on_btnCoreReset_clicked()
     emu->cmdCoreReset();
     emu->cmdEmuStatus();
     emu->cmdGameInfo();
+}
+
+void MainWindow::on_btnReadWriteTest_clicked()
+{
+    auto oldChk = ui->chkReadAppend->checkState();
+    // Secret of Evermore call beads = WRAM 0x231c
+    emu->waitForBytesWritten(100);
+    ui->txtReadData->clear();
+    ui->chkReadAppend->setCheckState(Qt::CheckState::Checked);
+    // single write, single read
+    emu->cmdCoreWriteMemory("WRAM", {"\x01\x00",2}, 0x231C);
+    emu->cmdCoreReadMemory ("WRAM", 0x231C, 1); // should give 01
+    // multi-write 1, multi-read
+    emu->cmdCoreWriteMemory("WRAM", { {0x231C, {"\x63",1}},{0x231B, {"\x00\x02",2}} } );
+    emu->cmdCoreReadMemory ("WRAM", {{ 0x231C,1 }, { 0x231B,2 }}); // should give 02 00 02
+    // multi-write 2, multi-read
+    QList<QPair<int,int>> tmp = { { 0x231C,1 }, { 0x231B,3 } };
+    emu->cmdCoreWriteMemory("WRAM", {"\x63\x00\x03\x00",4}, tmp);
+    emu->cmdCoreReadMemory ("WRAM", {{ 0x231C,1 }, { 0x231B,2 }}); // should give 03 00 03
+    // memory read/write from start
+    emu->cmdCoreWriteMemory("WRAM", {"\x00",1});
+    emu->cmdCoreReadMemory ("WRAM", 0, 1); // will give 00
+    emu->cmdCoreWriteMemory("WRAM", {"\x01",1});
+    emu->cmdCoreReadMemory ("WRAM", -1, 1); // should give 01
+    // memory read/write to end
+    emu->cmdCoreWriteMemory("WRAM", {"\x00",1}, 0x1ffff);
+    emu->cmdCoreReadMemory ("WRAM", 0x1ffff, 1); // will give 00
+    emu->cmdCoreWriteMemory("WRAM", {"\xaa\x77",2}, 0x1ffff);
+    emu->cmdCoreReadMemory ("WRAM", 0x1ffff); // should give aa
+    // memory read with padding
+    emu->cmdCoreReadMemory ("WRAM", { { 0x1ffff,3 }, {0x1ffff,3} }); // should give aa 00 00 aa
+
+    QTimer::singleShot(100, this, [this, oldChk](){
+        ui->chkReadAppend->setCheckState(oldChk);
+        if (emu->isConnected()) {
+            if (ui->txtReadData->document()->toPlainText() !=
+                    "01\n"
+                    "02 00 02\n"
+                    "03 00 03\n"
+                    "00\n"
+                    "01\n"
+                    "00\n"
+                    "aa\n"
+                    "aa 00 00 aa")
+            {
+                QMessageBox::critical(this, "Error", "Tests failed. Did you load a compatible ROM?");
+                return;
+            }
+        }
+        QMessageBox::information(this, "Success", "Read/write tests succeeded!");
+    });
 }
