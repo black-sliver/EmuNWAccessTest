@@ -135,16 +135,15 @@ void MainWindow::on_emu_readyRead()
         ui->lblEmu->setText(reply.ascii.join(", "));
     }
     else if (reply.cmd == "EMU_STATUS" && reply.isAscii && !reply.isError) {
-        auto newState = reply.toMap()["state"];
+        auto newState = reply["state"];
         if (lastEmuState != newState) {
             lastEmuState = newState;
             stateChanged = true;
         }
     }
     else if (reply.cmd == "GAME_INFO" && reply.isAscii && !reply.isError) {
-        auto map = reply.toMap();
-        auto newGameInfo = map["name"];
-        if (map.contains("region")) newGameInfo += " [" + map["region"] + "]";
+        auto newGameInfo = reply["name"];
+        if (reply.contains("region")) newGameInfo += " [" + reply["region"] + "]";
         if (lastGameInfo != newGameInfo) {
             lastGameInfo = newGameInfo;
             stateChanged = true;
