@@ -3,11 +3,14 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QTimer>
+#include <QLoggingCategory>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    QLoggingCategory::setFilterRules(QStringLiteral("EmuNWAccessClient.debug=true"));
+
     ui->setupUi(this);
 
     ui->txtReadData->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
