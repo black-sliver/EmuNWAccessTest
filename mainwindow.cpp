@@ -335,6 +335,10 @@ void MainWindow::on_btnReadWriteTest_clicked()
     // single write, single read
     emu->cmdCoreWriteMemory("WRAM", {"\x01\x00",2}, 0x231C);
     emu->cmdCoreReadMemory ("WRAM", 0x231C, 1); // should give 01
+    // single write split, single read
+    emu->cmdCoreWriteMemoryPrepare("WRAM", {{0x231C,1}});
+    emu->cmdCoreWriteMemoryData({"\x00",1});
+    emu->cmdCoreReadMemory ("WRAM", 0x231C, 1); // should give 00
     // multi-write 1, multi-read
     emu->cmdCoreWriteMemory("WRAM", { {0x231C, {"\x63",1}},{0x231B, {"\x00\x02",2}} } );
     emu->cmdCoreReadMemory ("WRAM", {{ 0x231C,1 }, { 0x231B,2 }}); // should give 02 00 02
@@ -360,6 +364,7 @@ void MainWindow::on_btnReadWriteTest_clicked()
         if (emu->isConnected()) {
             if (ui->txtReadData->document()->toPlainText() !=
                     "01\n"
+                    "00\n"
                     "02 00 02\n"
                     "03 00 03\n"
                     "00\n"
